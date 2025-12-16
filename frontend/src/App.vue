@@ -1,44 +1,69 @@
 <template>
   <div id="app">
-    <el-container>
-      <el-header>
-        <el-menu mode="horizontal" router>
-          <el-menu-item index="/">首页</el-menu-item>
-          <el-menu-item index="/products">商品管理</el-menu-item>
-          <el-menu-item index="/login" style="float: right" v-if="!isAuthenticated">登录</el-menu-item>
-          <el-menu-item index="/" style="float: right" v-else @click="logout">退出</el-menu-item>
-        </el-menu>
-      </el-header>
-      <el-main>
-        <router-view/>
-      </el-main>
-    </el-container>
+    <nav class="navbar">
+      <h1>电商数据管理系统</h1>
+    </nav>
+    <div class="container">
+      <div class="sidebar">
+        <ul>
+          <li @click="currentView = 'products'">商品管理</li>
+          <li @click="currentView = 'orders'">订单管理</li>
+          <li @click="currentView = 'analytics'">数据分析</li>
+        </ul>
+      </div>
+      <div class="main-content">
+        <div v-if="currentView === 'products'">
+          <h2>商品列表</h2>
+          <div class="product-list">
+            <div v-for="product in products" :key="product.id" class="product-card">
+              <img :src="product.image" alt="商品图片">
+              <h3>{{ product.name }}</h3>
+              <p>{{ product.description }}</p>
+              <span class="price">¥{{ product.price }}</span>
+              <button @click="editProduct(product)">编辑</button>
+              <button @click="deleteProduct(product.id)">删除</button>
+            </div>
+          </div>
+          <button @click="showAddForm = true">添加商品</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
 export default {
   name: 'App',
-  computed: {
-    isAuthenticated() {
-      return this.$store.state.token
+  data() {
+    return {
+      currentView: 'products',
+      products: [],
+      showAddForm: false
     }
   },
+  mounted() {
+    this.fetchProducts();
+  },
   methods: {
-    logout() {
-      this.$store.commit('clearToken')
-      this.$store.commit('setUser', null)
-      this.$router.push('/login')
+    async fetchProducts() {
+      try {
+        const response = await fetch(`${process.env.VUE_APP_API_URL}/products`);
+        this.products = await response.json();
+      } catch (error) {
+        console.error('获取商品失败:', error);
+      }
+    },
+    async deleteProduct(id) {
+      if (confirm('确认删除?')) {
+        await fetch(`${process.env.VUE_APP_API_URL}/products/${id}`, {
+          method: 'DELETE'
+        });
+        this.fetchProducts();
+      }
     }
   }
 }
 </script>
 
 <style>
-#app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  color: #2c3e50;
-}
 </style>
