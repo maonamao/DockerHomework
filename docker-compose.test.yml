@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  mysql-test:
+    image: mysql:8.0
+    container_name: ecommerce-mysql-test
+    environment:
+      MYSQL_ROOT_PASSWORD: test123
+      MYSQL_DATABASE: ecommerce_test
+      MYSQL_USER: test_user
+      MYSQL_PASSWORD: test123
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend-test:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.test
+    container_name: ecommerce-backend-test
+    depends_on:
+      mysql-test:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: test
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-test:3306/ecommerce_test
+      SPRING_DATASOURCE_USERNAME: test_user
+      SPRING_DATASOURCE_PASSWORD: test123
+    ports:
+      - "8081:8080"
+
+  test-runner:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.test
+    container_name: test-runner
+    depends_on:
+      backend-test:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: test
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-test:3306/ecommerce_test
+    command: ["mvn", "test"]
+    volumes:
+      - ./backend/target/surefire-reports:/app/target/surefire-reports

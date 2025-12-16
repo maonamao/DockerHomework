@@ -1,0 +1,17 @@
+FROM maven:3.8.6-openjdk-11-slim AS build
+
+WORKDIR /app
+
+COPY pom.xml .
+COPY src ./src
+
+# 下载依赖
+RUN mvn dependency:go-offline -B
+
+# 构建应用
+RUN mvn clean package -DskipTests
+
+# 测试阶段
+FROM build AS test
+COPY . .
+RUN mvn test -Dspring.profiles.active=test

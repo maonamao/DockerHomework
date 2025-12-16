@@ -1,0 +1,49 @@
+# 忽略操作系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 忽略IDE配置文件
+.vscode/
+.idea/
+*.iml
+*.swp
+
+# 忽略前端依赖和构建产物
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/.env.*.local
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# 忽略后端构建产物
+backend/target/
+backend/.idea/
+backend/*.iml
+backend/.project
+backend/.settings/
+backend/.classpath
+
+# 忽略数据库数据文件
+mysql/data/
+mysql/logs/
+
+# 忽略Docker相关
+docker-compose.override.yml
+*.env
+.env.*.local
+
+# 忽略测试和报告文件
+**/coverage/
+**/.nyc_output
+**/test-results/
+**/junit.xml
+
+# 忽略上传的敏感文件
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
