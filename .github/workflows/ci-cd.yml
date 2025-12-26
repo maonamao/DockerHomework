@@ -115,12 +115,15 @@ jobs:
           with open('.ssh/github_actions', 'w', encoding='utf-8') as f:
               f.write(key)
           PY
-          chmod 644 .ssh/github_actions
+          # ========== 修改点1：将644改为600（SSH强制要求私钥权限为600） ==========
+          chmod 600 .ssh/github_actions
 
       - name: Debug SSH key fingerprint
         run: |
           set -e
-          ssh-keygen -lf .ssh/github_actions
+          # ========== 新增：验证私钥权限和有效性 ==========
+          ls -la .ssh/github_actions  # 输出权限，确认是-rw-------
+          ssh-keygen -lf .ssh/github_actions || echo "私钥格式错误，请检查Secrets"
 
       - name: Deploy via SSH (k3s kubectl)
         uses: appleboy/ssh-action@v1.0.3
@@ -128,10 +131,13 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key_path: .ssh/github_actions
-          passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          password: ${{ secrets.SSH_PASSWORD }}
+          # ========== 修改点2：删除无用的passphrase/password（你私钥无密码） ==========
+          # passphrase: ${{ secrets.SSH_PASSPHRASE }}  # 删掉：私钥无密码，留着会干扰
+          # password: ${{ secrets.SSH_PASSWORD }}      # 删掉：用公钥认证，不需要密码
           port: ${{ secrets.SSH_PORT }}
           fingerprint: "SHA256:AG7nRpWC+NVXcUCumX0/e+A9Qucyb3yLsIFycJif6Tg"
+          # ========== 修改点3：强制设置Runner端私钥权限 ==========
+          key_permissions: "0600"
           debug: true
           script: |
             set -e
