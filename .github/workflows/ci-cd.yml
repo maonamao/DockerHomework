@@ -3,8 +3,8 @@ name: CI-CD
 on:
   pull_request:
     branches: ["main"]
-  push:
-    branches: ["main"]
+    types: [opened, synchronize, reopened, closed]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -13,6 +13,9 @@ permissions:
 jobs:
   test-build:
     runs-on: ubuntu-latest
+
+    env:
+      IMAGE_TAG: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
 
     steps:
       - name: Checkout
@@ -55,34 +58,43 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Login to DockerHub
-        if: github.event_name == 'push'
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build & (optionally) push backend image
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
         uses: docker/build-push-action@v6
         with:
           context: ./backend
-          push: ${{ github.event_name == 'push' }}
+          push: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true) }}
           tags: |
-            maonamao/backend:${{ github.sha }}
+            maonamao/backend:${{ env.IMAGE_TAG }}
             maonamao/backend:latest
 
       - name: Build & (optionally) push frontend image
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
-          push: ${{ github.event_name == 'push' }}
+          push: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true) }}
           tags: |
-            maonamao/frontend:${{ github.sha }}
+            maonamao/frontend:${{ env.IMAGE_TAG }}
             maonamao/frontend:latest
 
   deploy:
     needs: test-build
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
+
+    env:
+      IMAGE_TAG: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+
+    concurrency:
+      group: ecommerce-deploy
+      cancel-in-progress: true
 
     steps:
       - name: Deploy via SSH (k3s kubectl)
@@ -135,7 +147,7 @@ jobs:
               admin-password: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
             EOF
 
-            TAG="${{ github.sha }}"
+            TAG="${{ env.IMAGE_TAG }}"
 
             $KUBECTL -n ecommerce set image deployment/frontend frontend=maonamao/frontend:$TAG
 
