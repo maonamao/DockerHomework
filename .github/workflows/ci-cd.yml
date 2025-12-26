@@ -63,6 +63,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: crpi-crgxq2ovcvhcn869.cn-chengdu.personal.cr.aliyuncs.com
 
       - name: Build & (optionally) push backend image
         if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
@@ -71,8 +72,8 @@ jobs:
           context: ./backend
           push: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' }}
           tags: |
-            maonamao/backend:${{ env.IMAGE_TAG }}
-            maonamao/backend:latest
+            crpi-crgxq2ovcvhcn869.cn-chengdu.personal.cr.aliyuncs.com/maonamao/backend:${{ env.IMAGE_TAG }}
+            crpi-crgxq2ovcvhcn869.cn-chengdu.personal.cr.aliyuncs.com/maonamao/backend:latest
 
       - name: Build & (optionally) push frontend image
         if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
@@ -81,8 +82,8 @@ jobs:
           context: ./frontend
           push: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' }}
           tags: |
-            maonamao/frontend:${{ env.IMAGE_TAG }}
-            maonamao/frontend:latest
+            crpi-crgxq2ovcvhcn869.cn-chengdu.personal.cr.aliyuncs.com/maonamao/frontend:${{ env.IMAGE_TAG }}
+            crpi-crgxq2ovcvhcn869.cn-chengdu.personal.cr.aliyuncs.com/maonamao/frontend:latest
 
   deploy:
     needs: test-build
