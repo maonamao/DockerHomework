@@ -105,6 +105,7 @@ jobs:
         run: |
           set -e
           mkdir -p .ssh
+          chmod 755 .ssh
           python - <<'PY'
           import os
           key = os.environ.get('SSH_PRIVATE_KEY', '')
@@ -114,7 +115,7 @@ jobs:
           with open('.ssh/deploy_key', 'w', encoding='utf-8') as f:
               f.write(key)
           PY
-          chmod 600 .ssh/deploy_key
+          chmod 644 .ssh/deploy_key
 
       - name: Deploy via SSH (k3s kubectl)
         uses: appleboy/ssh-action@v1.0.3
