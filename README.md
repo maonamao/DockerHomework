@@ -1,6 +1,6 @@
 # DockerHomework
 docker大作业仓库
-目录结构：
+目录结构是：
 project-root/  # 项目根目录
 ├── docker-compose.yml          # 核心：编排前后端+数据库的总配置
 ├── .env                        # 全局环境变量（数据库密码、端口、服务名等，避免硬编码）
