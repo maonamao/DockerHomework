@@ -99,6 +99,12 @@ jobs:
       cancel-in-progress: true
 
     steps:
+      - name: Validate deploy secrets
+        if: ${{ secrets.SSH_HOST == '' || secrets.SSH_USER == '' || secrets.SSH_PORT == '' || secrets.DEPLOY_PATH == '' || (secrets.SSH_PRIVATE_KEY == '' && secrets.SSH_PASSWORD == '') }}
+        run: |
+          echo "Missing required deploy secrets. Please set: SSH_HOST, SSH_USER, SSH_PORT, DEPLOY_PATH, and (SSH_PRIVATE_KEY or SSH_PASSWORD)." >&2
+          exit 1
+
       - name: Deploy via SSH (k3s kubectl)
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -106,7 +112,9 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          password: ${{ secrets.SSH_PASSWORD }}
           port: ${{ secrets.SSH_PORT }}
+          debug: true
           script: |
             set -e
             cd ${{ secrets.DEPLOY_PATH }}
