@@ -113,74 +113,36 @@ jobs:
       - name: Deploy via SSH (k3s kubectl)
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          port: ${{ secrets.SSH_PORT }}
-
-          # ✅ 直接用 key，而不是 key_path
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-          # 可选，但推荐
-          fingerprint: "SHA256:AG7nRpWC+NVXcUCumX0/e+A9Qucyb3yLsIFycJif6Tg"
-          debug: true
+          # ... 其他配置 ...
           script: |
             set -e
             cd ${{ secrets.DEPLOY_PATH }}
-
             test -d k8s
-
             if command -v k3s >/dev/null 2>&1; then
               KUBECTL="k3s kubectl"
             else
               KUBECTL="kubectl"
             fi
-
-            $KUBECTL apply -f k8s/ecommerce/00-namespace.yml
-            $KUBECTL apply -f k8s/monitoring/00-namespace.yml
-
-            $KUBECTL apply -f k8s/ecommerce
-            $KUBECTL apply -f k8s/monitoring
-
-            cat <<'EOF' | $KUBECTL apply -f -
-            apiVersion: v1
-            kind: Secret
-            metadata:
-              name: mysql-secret
-              namespace: ecommerce
-            type: Opaque
-            stringData:
-              MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
-              MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
-              MYSQL_USER: ${{ secrets.MYSQL_USER }}
-              MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
-            EOF
-
-            cat <<'EOF' | $KUBECTL apply -f -
-            apiVersion: v1
-            kind: Secret
-            metadata:
-              name: grafana-admin
-              namespace: monitoring
-            type: Opaque
-            stringData:
-              admin-user: ${{ secrets.GRAFANA_ADMIN_USER }}
-              admin-password: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
-            EOF
-
+            
+            # ... namespace 和 secret 创建 ...
+            
             TAG="${{ env.IMAGE_TAG }}"
-
-            $KUBECTL -n ecommerce set image deployment/frontend frontend=maonamao/frontend:$TAG
-
+            
+            # 🔧 修改这里 - 添加完整的阿里云镜像地址
+            $KUBECTL -n ecommerce set image deployment/frontend \
+              frontend=crpi-crgxq2ovcvhcn869.cn-chengdu.personal.cr.aliyuncs.com/maonamao/frontend:$TAG
+            
             ACTIVE_TRACK=$($KUBECTL -n ecommerce get svc backend -o jsonpath='{.spec.selector.track}')
             if [ "$ACTIVE_TRACK" = "blue" ]; then
               INACTIVE_TRACK="green"
             else
               INACTIVE_TRACK="blue"
             fi
-
-            $KUBECTL -n ecommerce set image deployment/backend-$INACTIVE_TRACK backend=maonamao/backend:$TAG
+            
+            # 🔧 修改这里 - 添加完整的阿里云镜像地址
+            $KUBECTL -n ecommerce set image deployment/backend-$INACTIVE_TRACK \
+              backend=crpi-crgxq2ovcvhcn869.cn-chengdu.personal.cr.aliyuncs.com/maonamao/backend:$TAG
+            
             $KUBECTL -n ecommerce rollout status deployment/backend-$INACTIVE_TRACK --timeout=120s
-
             $KUBECTL -n ecommerce patch svc backend -p '{"spec":{"selector":{"app":"backend","track":"'"$INACTIVE_TRACK"'"}}}'
-
             $KUBECTL -n ecommerce rollout status deployment/frontend --timeout=120s
