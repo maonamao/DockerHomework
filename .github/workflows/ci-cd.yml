@@ -15,10 +15,8 @@ permissions:
 jobs:
   test-build:
     runs-on: ubuntu-latest
-
     env:
       IMAGE_TAG: ${{ github.sha }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -90,22 +88,24 @@ jobs:
     needs: test-build
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
-
     env:
       IMAGE_TAG: ${{ github.sha }}
-
     concurrency:
       group: ecommerce-deploy
       cancel-in-progress: true
-
     steps:
       - name: Prepare SSH private key
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           set -e
+          # ========== 关键修改1：严格配置.ssh目录+文件权限链 ==========
+          # 1. 清空旧目录（避免残留权限问题）
+          rm -rf .ssh
+          # 2. 创建.ssh目录，权限必须是700（仅当前用户访问）
           mkdir -p .ssh
-          chmod 755 .ssh
+          chmod 700 .ssh
+          # 3. 写入私钥文件，权限必须是600（仅当前用户读写）
           python - <<'PY'
           import os
           key = os.environ.get('SSH_PRIVATE_KEY', '')
@@ -115,14 +115,10 @@ jobs:
           with open('.ssh/github_actions', 'w', encoding='utf-8') as f:
               f.write(key)
           PY
-          # ========== 修改点1：将644改为600（SSH强制要求私钥权限为600） ==========
           chmod 600 .ssh/github_actions
-
-      - name: Debug SSH key fingerprint
-        run: |
-          set -e
-          # ========== 新增：验证私钥权限和有效性 ==========
-          ls -la .ssh/github_actions  # 输出权限，确认是-rw-------
+          # 4. 验证权限（日志中可查看，方便排错）
+          ls -la .ssh/
+          ls -la .ssh/github_actions
           ssh-keygen -lf .ssh/github_actions || echo "私钥格式错误，请检查Secrets"
 
       - name: Deploy via SSH (k3s kubectl)
@@ -130,15 +126,15 @@ jobs:
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
+          # ========== 关键修改2：移除无效的key_permissions参数 ==========
+          # ========== 关键修改3：保留key_path，确保路径正确 ==========
           key_path: .ssh/github_actions
-          # ========== 修改点2：删除无用的passphrase/password（你私钥无密码） ==========
-          # passphrase: ${{ secrets.SSH_PASSPHRASE }}  # 删掉：私钥无密码，留着会干扰
-          # password: ${{ secrets.SSH_PASSWORD }}      # 删掉：用公钥认证，不需要密码
           port: ${{ secrets.SSH_PORT }}
           fingerprint: "SHA256:AG7nRpWC+NVXcUCumX0/e+A9Qucyb3yLsIFycJif6Tg"
-          # ========== 修改点3：强制设置Runner端私钥权限 ==========
-          key_permissions: "0600"
           debug: true
+          # ========== 关键修改4：删除无用的passphrase/password（避免干扰） ==========
+          # passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          # password: ${{ secrets.SSH_PASSWORD }}
           script: |
             set -e
             cd ${{ secrets.DEPLOY_PATH }}
