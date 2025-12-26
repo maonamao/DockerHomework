@@ -110,7 +110,15 @@ jobs:
           script: |
             set -e
             cd ${{ secrets.DEPLOY_PATH }}
-            git pull
+            export GIT_TERMINAL_PROMPT=0
+            git --version
+            git remote -v
+
+            git config --global --unset-all http.proxy || true
+            git config --global --unset-all https.proxy || true
+            git config --global http.version HTTP/1.1
+
+            GIT_TRACE=1 GIT_CURL_VERBOSE=1 git pull --rebase --prune
 
             if command -v k3s >/dev/null 2>&1; then
               KUBECTL="k3s kubectl"
