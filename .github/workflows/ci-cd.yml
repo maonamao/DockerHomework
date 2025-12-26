@@ -112,22 +112,22 @@ jobs:
           if not key.strip():
               raise SystemExit('SSH_PRIVATE_KEY is empty')
           key = key.replace('\r\n', '\n')
-          with open('.ssh/deploy_key', 'w', encoding='utf-8') as f:
+          with open('.ssh/github_actions', 'w', encoding='utf-8') as f:
               f.write(key)
           PY
-          chmod 644 .ssh/deploy_key
+          chmod 644 .ssh/github_actions
 
       - name: Debug SSH key fingerprint
         run: |
           set -e
-          ssh-keygen -lf .ssh/deploy_key
+          ssh-keygen -lf .ssh/github_actions
 
       - name: Deploy via SSH (k3s kubectl)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
-          key_path: .ssh/deploy_key
+          key_path: .ssh/github_actions
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           password: ${{ secrets.SSH_PASSWORD }}
           port: ${{ secrets.SSH_PORT }}
