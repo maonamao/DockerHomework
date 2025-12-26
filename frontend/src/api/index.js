@@ -4,7 +4,7 @@ import axios from 'axios'
 // 本地开发时使用代理或直接连接后端
 const apiClient = axios.create({
   // 方案1：直接连接后端（端口8080）
-  baseURL: 'http://localhost:8080/api',
+  baseURL: process.env.VUE_APP_API_BASE_URL || '/api',
   // 方案2：使用Vue开发服务器代理（需要vue.config.js配置）
   // baseURL: '/api',
   headers: {
