@@ -1,0 +1,2 @@
+-- 创建products表（如果不存在）
+-- 已迁移：真实初始化脚本请使用 ../../../../mysql/init/schema.sql

@@ -1,0 +1,166 @@
+name: CI-CD
+
+on:
+  pull_request:
+    branches: ["main"]
+    types: [opened, synchronize, reopened, closed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+
+    env:
+      IMAGE_TAG: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "8"
+          cache: maven
+
+      - name: Backend unit tests (JUnit)
+        working-directory: backend
+        run: mvn -B test
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Frontend unit tests (JUnit)
+        run: bash ci/frontend-unit-test.sh
+
+      - name: Integration tests (docker compose)
+        run: bash ci/integration-test.sh
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            backend/target/surefire-reports
+            ci/reports
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & (optionally) push backend image
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true) }}
+          tags: |
+            maonamao/backend:${{ env.IMAGE_TAG }}
+            maonamao/backend:latest
+
+      - name: Build & (optionally) push frontend image
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true) }}
+          tags: |
+            maonamao/frontend:${{ env.IMAGE_TAG }}
+            maonamao/frontend:latest
+
+  deploy:
+    needs: test-build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
+
+    env:
+      IMAGE_TAG: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+
+    concurrency:
+      group: ecommerce-deploy
+      cancel-in-progress: true
+
+    steps:
+      - name: Deploy via SSH (k3s kubectl)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            set -e
+            cd ${{ secrets.DEPLOY_PATH }}
+            git pull
+
+            if command -v k3s >/dev/null 2>&1; then
+              KUBECTL="k3s kubectl"
+            else
+              KUBECTL="kubectl"
+            fi
+
+            $KUBECTL apply -f k8s/ecommerce/00-namespace.yml
+            $KUBECTL apply -f k8s/monitoring/00-namespace.yml
+
+            $KUBECTL apply -f k8s/ecommerce
+            $KUBECTL apply -f k8s/monitoring
+
+            cat <<'EOF' | $KUBECTL apply -f -
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: mysql-secret
+              namespace: ecommerce
+            type: Opaque
+            stringData:
+              MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+              MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
+              MYSQL_USER: ${{ secrets.MYSQL_USER }}
+              MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+            EOF
+
+            cat <<'EOF' | $KUBECTL apply -f -
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: grafana-admin
+              namespace: monitoring
+            type: Opaque
+            stringData:
+              admin-user: ${{ secrets.GRAFANA_ADMIN_USER }}
+              admin-password: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+            EOF
+
+            TAG="${{ env.IMAGE_TAG }}"
+
+            $KUBECTL -n ecommerce set image deployment/frontend frontend=maonamao/frontend:$TAG
+
+            ACTIVE_TRACK=$($KUBECTL -n ecommerce get svc backend -o jsonpath='{.spec.selector.track}')
+            if [ "$ACTIVE_TRACK" = "blue" ]; then
+              INACTIVE_TRACK="green"
+            else
+              INACTIVE_TRACK="blue"
+            fi
+
+            $KUBECTL -n ecommerce set image deployment/backend-$INACTIVE_TRACK backend=maonamao/backend:$TAG
+            $KUBECTL -n ecommerce rollout status deployment/backend-$INACTIVE_TRACK --timeout=120s
+
+            $KUBECTL -n ecommerce patch svc backend -p '{"spec":{"selector":{"app":"backend","track":"'"$INACTIVE_TRACK"'"}}}'
+
+            $KUBECTL -n ecommerce rollout status deployment/frontend --timeout=120s
