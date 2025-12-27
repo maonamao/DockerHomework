@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: mysql
-          image: registry.cn-hangzhou.aliyuncs.com/library/mysql:8.0
+          image: crpi-crgxq2ovcvhcn869.cn-chengdu.personal.cr.aliyuncs.com/maonamao/mysql:8.0
           ports:
             - name: mysql
               containerPort: 3306
