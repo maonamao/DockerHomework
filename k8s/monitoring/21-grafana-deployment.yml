@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: grafana
-          image: grafana/grafana:10.2.3
+          image: crpi-crgxq2ovcvhcn869.cn-chengdu.personal.cr.aliyuncs.com/maonamao/grafana:10.2.3
           ports:
             - name: http
               containerPort: 3000
