@@ -120,7 +120,7 @@ jobs:
           fingerprint: "SHA256:AG7nRpWC+NVXcUCumX0/e+A9Qucyb3yLsIFycJif6Tg"
           debug: true
           timeout: 30s
-          command_timeout: 10m
+          command_timeout: 30m
           script: |
             set -e
             cd ${{ secrets.DEPLOY_PATH }}
@@ -176,8 +176,14 @@ jobs:
               INACTIVE_TRACK="blue"
             fi
             
+            $KUBECTL -n ecommerce scale deployment/backend-$INACTIVE_TRACK --replicas=0
+            $KUBECTL -n ecommerce delete pod -l app=backend,track=$INACTIVE_TRACK --ignore-not-found=true --grace-period=0 --force
+            $KUBECTL -n ecommerce wait --for=delete pod -l app=backend,track=$INACTIVE_TRACK --timeout=5m || true
+            
             $KUBECTL -n ecommerce set image deployment/backend-$INACTIVE_TRACK \
               backend=$REGISTRY/backend:$TAG
+            
+            $KUBECTL -n ecommerce scale deployment/backend-$INACTIVE_TRACK --replicas=1
             
             $KUBECTL -n ecommerce rollout status deployment/backend-$INACTIVE_TRACK --timeout=10m
             
