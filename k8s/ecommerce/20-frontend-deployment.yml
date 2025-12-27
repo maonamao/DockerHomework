@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: maonamao/frontend:latest
+          image: crpi-crgxq2ovcvhcn869.cn-chengdu.personal.cr.aliyuncs.com/maonamao/frontend:latest
           ports:
             - name: http
               containerPort: 80
