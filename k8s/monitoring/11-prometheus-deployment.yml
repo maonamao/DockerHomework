@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: prometheus
-          image: prom/prometheus:v2.48.1
+          image: crpi-crgxq2ovcvhcn869.cn-chengdu.personal.cr.aliyuncs.com/maonamao/prometheus:v2.48.1
           args:
             - --config.file=/etc/prometheus/prometheus.yml
             - --storage.tsdb.path=/prometheus
